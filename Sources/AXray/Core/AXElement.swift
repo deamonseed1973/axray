@@ -28,7 +28,19 @@ struct AXElement {
     /// Direct children of this element.
     var children: [AXElement] {
         guard let childrenRef: CFArray = cfValue(kAXChildrenAttribute) else { return [] }
-        return (childrenRef as [AnyObject]).compactMap { $0 as? AXUIElement }.map { AXElement(element: $0) }
+        let count = CFArrayGetCount(childrenRef)
+        var result: [AXElement] = []
+        result.reserveCapacity(count)
+        for i in 0..<count {
+            guard let rawPtr = CFArrayGetValueAtIndex(childrenRef, i) else { continue }
+            // AXUIElement is a CFTypeRef; check type ID before casting
+            let axTypeID = AXUIElementGetTypeID()
+            let valueTypeID = CFGetTypeID(Unmanaged<CFTypeRef>.fromOpaque(rawPtr).takeUnretainedValue())
+            guard valueTypeID == axTypeID else { continue }
+            let child = Unmanaged<AXUIElement>.fromOpaque(rawPtr).takeUnretainedValue()
+            result.append(AXElement(element: child))
+        }
+        return result
     }
 
     /// Concatenation of all AX-provided text attributes.
